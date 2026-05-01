@@ -1,59 +1,88 @@
 import numpy as np
 import json
-
-class TC1Agent:
-    def __init__(self, gamma=0.99):
+class TC2Agent:
+    def __init__(self, node_id, gamma=0.99):
+        self.node_id = node_id
         self.gamma = gamma
-        self.V_table = {}  
-        self.Q_table = {}  
-        self.transitions = {} 
-        self.counts = {} 
+        self.Q_table = {}  # (state, action) -> value
+        self.V_table = {}  # state -> value
         
-        # Initialisation propre des compteurs de probabilité du feu [cite: 117]
-        self.state_seen_counts = {}
-        self.state_action_counts = {}
-
-    def get_state_value(self, state):
-        return self.V_table.get(state, 0.0)
+        # --- Variables pour l'apprentissage RTDP ---
+        self.counts = {}             # (state, action) -> total_seen
+        self.transitions = {}        # (state, action, next_state) -> count
+        self.state_seen_counts = {}   # state -> total_seen
+        self.state_action_counts = {} # (state, action) -> count
 
     def get_q_value(self, state, action):
         return self.Q_table.get((state, action), 0.0)
 
-    def compute_gain(self, car_state):
-        # Gain = Q(s, red) - Q(s, green) 
-        return self.get_q_value(car_state, 'red') - self.get_q_value(car_state, 'green')
+    def get_state_value(self, state):
+        return self.V_table.get(state, 0.0)
 
-    def select_action(self, intersection_cars, possible_actions):
-        best_action = None
-        max_total_gain = -float('inf')
-
-        for action in possible_actions:
-            total_gain = 0
-            for car in intersection_cars:
-                # Seules les voitures aux feux mis au vert par l'action votent 
-                if car.tl in action: 
-                    total_gain += self.compute_gain(car.current_state)
+    def select_action(self, intersection, all_agents, network):
+        """ Logique TC-2 : Vote avec anticipation du carrefour suivant """
+        
+        # 1. RÉGLAGE : On crée une liste de la taille RÉELLE du nombre d'actions
+        num_actions = len(intersection.possible_actions)
+        gains = [0.0] * num_actions 
+        
+        # 2. RÉGLAGE : On itère sur toutes les actions (0 à 5)
+        for action in range(num_actions):
+            impacted_cars = intersection.get_cars_for_action(action)
+            total_gain = 0.0
             
-            if total_gain > max_total_gain:
-                max_total_gain = total_gain
-                best_action = action
-        return best_action
+            for car in impacted_cars:
+                state = car.current_state
+                q_red = self.get_q_value(state, 'red')
+                q_green = self.get_q_value(state, 'green')
+                
+                # Look-ahead vers le carrefour suivant
+                next_stop = network.get_next_stop(self.node_id, car.tl)
+                v_next = 0.0
+                if next_stop is not None:
+                    next_node_id, entry_tl = next_stop
+                    next_state = (entry_tl, 20, car.destination)
+                    v_next = all_agents[next_node_id].get_state_value(next_state)
+                
+                # Formule TC-2 : Gain = Q_rouge - (Q_vert + gamma * V_suivant)
+                car_gain = q_red - (q_green + self.gamma * v_next)
+                total_gain += car_gain
+            
+            gains[action] = total_gain
+            
+        return np.argmax(gains)
 
     def update_model(self, state, action, next_state):
-        """ Regroupe toute la logique d'apprentissage [cite: 127, 156] """
-        # 1. Mise à jour des probabilités de transition P(s'|s,a) [cite: 158]
+        """ Apprentissage par modèle (RTDP) """
         sa_key = (state, action)
-        self.counts[sa_key] = self.counts.get(sa_key, 0) + 1
         
+        # 1. Mise à jour des fréquences
+        self.counts[sa_key] = self.counts.get(sa_key, 0) + 1
         sas_prime_key = (state, action, next_state)
         self.transitions[sas_prime_key] = self.transitions.get(sas_prime_key, 0) + 1
 
-        # 2. Mise à jour de la probabilité P(L|s) [cite: 117]
+        # 2. Mise à jour pour le calcul de P(L|s)
         self.state_seen_counts[state] = self.state_seen_counts.get(state, 0) + 1
         self.state_action_counts[sa_key] = self.state_action_counts.get(sa_key, 0) + 1
 
-        # 3. Calcul de Bellman (Q) et mise à jour de V [cite: 121, 126]
+        # 3. Mise à jour de Bellman
         self.perform_rtdp_update(state, action)
+
+    def perform_rtdp_update(self, state, action):
+        sa_key = (state, action)
+        total_sa = self.counts.get(sa_key, 0)
+        if total_sa == 0: return
+
+        q_new = 0.0
+        # Somme des (Probabilité * (Récompense + gamma * Valeur_Futur))
+        for (s, a, s_prime), count in self.transitions.items():
+            if s == state and a == action:
+                prob = count / total_sa
+                r = 1.0 if s_prime == state else 0.0 # Coût = 1 si la voiture n'a pas bougé
+                q_new += prob * (r + self.gamma * self.get_state_value(s_prime))
+
+        self.Q_table[sa_key] = q_new
+        self.update_v_value(state)
 
     def update_v_value(self, state):
         total_obs = self.state_seen_counts.get(state, 0)
@@ -65,58 +94,16 @@ class TC1Agent:
             v_new += p_L_s * self.get_q_value(state, act)
         self.V_table[state] = v_new
 
-    def perform_rtdp_update(self, state, action):
-        sa_key = (state, action)
-        total_sa = self.counts.get(sa_key, 0)
-        if total_sa == 0: return
-
-        q_new = 0.0
-        # On itère sur les transitions connues pour cet état-action [cite: 121]
-        for key, count in self.transitions.items():
-            if key[0] == state and key[1] == action:
-                s_prime = key[2]
-                prob = count / total_sa
-                # R = 1 si immobile, 0 si mouvement [cite: 119]
-                r = 1.0 if s_prime == state else 0.0
-                q_new += prob * (r + self.gamma * self.get_state_value(s_prime))
-
-        self.Q_table[sa_key] = q_new
-        self.update_v_value(state)
-
-
-    def save_tables(self, filename="tables.json"):
-        # On convertit les clés (tuples) en chaînes de caractères pour le JSON
-        data = {
-            "Q_table": {str(k): v for k, v in self.Q_table.items()},
-            "V_table": {str(k): v for k, v in self.V_table.items()}
-        }
-        with open(filename, 'w') as f:
-            json.dump(data, f)
-        print(f"Tables sauvegardées dans {filename}")
-
-    def load_tables(self, filename="tables.json"):
-        with open(filename, 'r') as f:
-            data = json.load(f)
-            # On peut reconstruire les tuples ici si nécessaire, 
-            # ou adapter la recherche pour lire les strings.
-            self.Q_table = {eval(k): v for k, v in data["Q_table"].items()}
-            self.V_table = {eval(k): v for k, v in data["V_table"].items()}
-
-    
-
-    def save_brain(self, filepath="tc1_brain.json"):
-        # Convertir les clés (tuples) en strings pour JSON
+    def save_brain(self, filepath="tc2_brain.json"):
         serializable_q = {str(k): v for k, v in self.Q_table.items()}
         serializable_v = {str(k): v for k, v in self.V_table.items()}
-        
         with open(filepath, "w") as f:
             json.dump({"Q": serializable_q, "V": serializable_v}, f)
-        print(f"Cerveau sauvegardé dans {filepath}")
+        print(f"Cerveau TC-2 sauvegardé dans {filepath}")
 
-    def load_brain(self, filepath="tc1_brain.json"):
+    def load_brain(self, filepath="tc2_brain.json"):
         with open(filepath, "r") as f:
             data = json.load(f)
-            # Reconvertir les strings en tuples
             self.Q_table = {eval(k): v for k, v in data["Q"].items()}
             self.V_table = {eval(k): v for k, v in data["V"].items()}
-        print("Cerveau chargé avec succès !")
+        print("Cerveau TC-2 chargé !")

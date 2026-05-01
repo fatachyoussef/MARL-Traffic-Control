@@ -92,3 +92,46 @@ class Intersection:
                     rewards_to_learn.append((car, old_state, 'red', 1, old_state))
         
         return rewards_to_learn
+    
+    def get_cars_for_action(self, action_index):
+        """
+        Retourne les voitures impactées par l'action choisie.
+        Action 0 : Nord (0) et Sud (1) passent au vert.
+        Action 1 : Est (2) et Ouest (3) passent au vert.
+        """
+        target_tls = [0, 1] if action_index == 0 else [2, 3]
+        cars_to_vote = []
+        for tl in target_tls:
+            # On récupère les voitures dans les files (lanes) correspondantes
+            cars_to_vote.extend(self.lanes[tl]) 
+        return cars_to_vote
+    
+
+# def get_cars_for_action(self, action_index):
+#     """
+#     Retourne la liste des voitures qui ont le droit de passer 
+#     selon l'index de l'action (0 ou 1).
+#     """
+#     # Si action 0 = Nord/Sud au vert (tl 0 et 1)
+#     # Si action 1 = Est/Ouest au vert (tl 2 et 3)
+#     target_tls = [0, 1] if action_index == 0 else [2, 3]
+    
+#     cars = []
+#     for tl in target_tls:
+#         cars.extend(self.lanes[tl])
+#     return cars
+
+# Dans env/intersection.py
+
+# def get_cars_for_action(self, action_index):
+#     """
+#     Retourne les voitures impactées par l'action choisie.
+#     Action 0 : Nord (0) et Sud (1) passent au vert.
+#     Action 1 : Est (2) et Ouest (3) passent au vert.
+#     """
+#     target_tls = [0, 1] if action_index == 0 else [2, 3]
+#     cars_to_vote = []
+#     for tl in target_tls:
+#         # On récupère les voitures dans les files (lanes) correspondantes
+#         cars_to_vote.extend(self.lanes[tl]) 
+#     return cars_to_vote

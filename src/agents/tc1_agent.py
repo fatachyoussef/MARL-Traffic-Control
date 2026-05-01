@@ -2,7 +2,8 @@ import numpy as np
 import json
 
 class TC1Agent:
-    def __init__(self, gamma=0.99):
+    def __init__(self, node_id, gamma=0.99):
+        self.node_id = node_id  # <--- Ajoute cette ligne
         self.gamma = gamma
         self.V_table = {}  
         self.Q_table = {}  
@@ -23,21 +24,25 @@ class TC1Agent:
         # Gain = Q(s, red) - Q(s, green) 
         return self.get_q_value(car_state, 'red') - self.get_q_value(car_state, 'green')
 
-    def select_action(self, intersection_cars, possible_actions):
-        best_action = None
+    def select_action(self, intersection):
+        intersection_cars = intersection.get_all_cars()
+        possible_actions = intersection.possible_actions
+        
+        best_action_index = 0 # On va stocker l'index maintenant
         max_total_gain = -float('inf')
 
-        for action in possible_actions:
+        # On itère sur les index (0, 1, 2...)
+        for i, action in enumerate(possible_actions):
             total_gain = 0
             for car in intersection_cars:
-                # Seules les voitures aux feux mis au vert par l'action votent 
                 if car.tl in action: 
                     total_gain += self.compute_gain(car.current_state)
             
             if total_gain > max_total_gain:
                 max_total_gain = total_gain
-                best_action = action
-        return best_action
+                best_action_index = i # On stocke l'index i
+                
+        return best_action_index # On renvoie l'entier i, pas la liste [0,1]
 
     def update_model(self, state, action, next_state):
         """ Regroupe toute la logique d'apprentissage [cite: 127, 156] """
