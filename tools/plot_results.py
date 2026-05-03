@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 1. Chargement des données
-data = pd.read_csv('learning_stats_low.csv')
+data = pd.read_csv('learning_stats_TC2_HIGH_v2.csv')
 
 # 2. Configuration du style
 plt.figure(figsize=(10, 6))
@@ -20,6 +20,6 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend()
 
 # 5. Sauvegarde
-plt.savefig('learning_low_curve.png', dpi=300)
-print("Graphique sauvegardé sous 'learning_curve.png'")
+plt.savefig('learning_stats_TC2_HIGH_Fraude.png', dpi=300)
+print("Graphique sauvegardé sous 'learning_stats_TC2_HIGH_Fraude.png'")
 plt.show()

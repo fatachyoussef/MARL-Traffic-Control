@@ -23,26 +23,61 @@ class TC1Agent:
     def compute_gain(self, car_state):
         # Gain = Q(s, red) - Q(s, green) 
         return self.get_q_value(car_state, 'red') - self.get_q_value(car_state, 'green')
-
+    
     def select_action(self, intersection):
-        intersection_cars = intersection.get_all_cars()
-        possible_actions = intersection.possible_actions
+        # On ne récupère plus bêtement toutes les voitures
+        # On demande à l'intersection quelles voitures sont visibles par les capteurs
+        all_cars = intersection.get_all_cars()
         
-        best_action_index = 0 # On va stocker l'index maintenant
+        # FILTRAGE POUR LA PANNE :
+        # L'agent ne prend en compte que les voitures sur les voies où le capteur fonctionne
+        visible_cars = []
+        for car in all_cars:
+            lane_id = getattr(car, 'direction', None) or getattr(car, 'lane_id', None)
+            if lane_id is None:
+                lane_id = car.tl
+            # On vérifie si la voie de la voiture est fonctionnelle au carrefour actuel
+            if intersection.get_lane_cars(lane_id) > 0 or len(intersection.lanes.get(lane_id, [])) == 0:
+                visible_cars.append(car)
+            # Si get_lane_cars renvoie 0 alors qu'il y a des voitures, 
+            # la voiture est ignorée dans le calcul du gain.
+        
+        possible_actions = intersection.possible_actions
+        best_action_index = 0 
         max_total_gain = -float('inf')
 
-        # On itère sur les index (0, 1, 2...)
         for i, action in enumerate(possible_actions):
             total_gain = 0
-            for car in intersection_cars:
+            # On calcule le gain uniquement sur les voitures "visibles"
+            for car in visible_cars:
                 if car.tl in action: 
                     total_gain += self.compute_gain(car.current_state)
             
             if total_gain > max_total_gain:
                 max_total_gain = total_gain
-                best_action_index = i # On stocke l'index i
+                best_action_index = i 
                 
-        return best_action_index # On renvoie l'entier i, pas la liste [0,1]
+        return best_action_index
+
+    # def select_action(self, intersection):
+    #     intersection_cars = intersection.get_all_cars()
+    #     possible_actions = intersection.possible_actions
+        
+    #     best_action_index = 0 # On va stocker l'index maintenant
+    #     max_total_gain = -float('inf')
+
+    #     # On itère sur les index (0, 1, 2...)
+    #     for i, action in enumerate(possible_actions):
+    #         total_gain = 0
+    #         for car in intersection_cars:
+    #             if car.tl in action: 
+    #                 total_gain += self.compute_gain(car.current_state)
+            
+    #         if total_gain > max_total_gain:
+    #             max_total_gain = total_gain
+    #             best_action_index = i # On stocke l'index i
+                
+    #     return best_action_index # On renvoie l'entier i, pas la liste [0,1]
 
     def update_model(self, state, action, next_state):
         """ Regroupe toute la logique d'apprentissage [cite: 127, 156] """

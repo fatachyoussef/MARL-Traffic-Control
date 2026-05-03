@@ -9,7 +9,7 @@ from agents.baseline_agent import FixedTimeAgent
 # ==========================================
 # CONFIGURATION DE L'EXPÉRIENCE
 # ==========================================
-AGENT_TYPE = "TC1"    # Options: "TC1", "TC2", "FIXED"
+AGENT_TYPE = "TC2"    # Options: "TC1", "TC2", "FIXED"
 TRAFFIC_LOAD = "HIGH"  # Options: "HIGH" (1-8 cars) ou "LOW" (1-4 cars)
 STEPS = 200000
 # ==========================================

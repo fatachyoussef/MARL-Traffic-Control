@@ -106,6 +106,12 @@ class Intersection:
             cars_to_vote.extend(self.lanes[tl]) 
         return cars_to_vote
     
+    def get_lane_cars(self, lane_id):
+        # Simulation d'une panne sur le Nœud 2, file Nord (exemple)
+        if self.node_id == 2 : # and lane_id == "NORTH"
+            return 0  # Le capteur est mort, il "voit" 0 voiture
+        
+        return len(self.lanes.get(lane_id, []))
 
 # def get_cars_for_action(self, action_index):
 #     """

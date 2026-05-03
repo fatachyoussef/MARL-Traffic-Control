@@ -19,24 +19,69 @@ class TC2Agent:
     def get_state_value(self, state):
         return self.V_table.get(state, 0.0)
 
-    def select_action(self, intersection, all_agents, network):
-        """ Logique TC-2 : Vote avec anticipation du carrefour suivant """
+    # def select_action(self, intersection, all_agents, network):
+    #     """ Logique TC-2 : Vote avec anticipation du carrefour suivant """
         
-        # 1. RÉGLAGE : On crée une liste de la taille RÉELLE du nombre d'actions
+    #     # 1. RÉGLAGE : On crée une liste de la taille RÉELLE du nombre d'actions
+    #     num_actions = len(intersection.possible_actions)
+    #     gains = [0.0] * num_actions 
+        
+    #     # 2. RÉGLAGE : On itère sur toutes les actions (0 à 5)
+    #     for action in range(num_actions):
+    #         impacted_cars = intersection.get_cars_for_action(action)
+    #         total_gain = 0.0
+            
+    #         for car in impacted_cars:
+    #             state = car.current_state
+    #             q_red = self.get_q_value(state, 'red')
+    #             q_green = self.get_q_value(state, 'green')
+                
+    #             # Look-ahead vers le carrefour suivant
+    #             next_stop = network.get_next_stop(self.node_id, car.tl)
+    #             v_next = 0.0
+    #             if next_stop is not None:
+    #                 next_node_id, entry_tl = next_stop
+    #                 next_state = (entry_tl, 20, car.destination)
+    #                 v_next = all_agents[next_node_id].get_state_value(next_state)
+                
+    #             # Formule TC-2 : Gain = Q_rouge - (Q_vert + gamma * V_suivant)
+    #             car_gain = q_red - (q_green + self.gamma * v_next)
+    #             total_gain += car_gain
+            
+    #         gains[action] = total_gain
+            
+    #     return np.argmax(gains)
+    def select_action(self, intersection, all_agents, network):
+        """ Logique TC-2 avec filtrage de panne (Sensor Failure) """
+        
         num_actions = len(intersection.possible_actions)
         gains = [0.0] * num_actions 
         
-        # 2. RÉGLAGE : On itère sur toutes les actions (0 à 5)
         for action in range(num_actions):
-            impacted_cars = intersection.get_cars_for_action(action)
+            # 1. On récupère les voitures que l'action pourrait faire passer
+            potential_cars = intersection.get_cars_for_action(action)
+            
+            # 2. FILTRAGE : L'agent ne "voit" que les voitures détectées par les capteurs
+            visible_cars = []
+            for car in potential_cars:
+                # Utilise l'attribut identifié précédemment (car.tl ou car.direction)
+                lane_id = car.tl 
+                
+                # Si get_lane_cars renvoie 0 (cas du Nœud 2), la voiture est invisible
+                if intersection.get_lane_cars(lane_id) > 0 or len(intersection.lanes.get(lane_id, [])) == 0:
+                    visible_cars.append(car)
+
             total_gain = 0.0
             
-            for car in impacted_cars:
+            # 3. Calcul du gain uniquement sur les voitures visibles
+            for car in visible_cars:
                 state = car.current_state
-                q_red = self.get_q_value(state, 'red')
-                q_green = self.get_q_value(state, 'green')
+                q_red = 0 
+                q_green = 0
                 
-                # Look-ahead vers le carrefour suivant
+                # Look-ahead (Anticipation) : C'est ici que la magie opère !
+                # Même si la voiture est sur un carrefour en panne, 
+                # on regarde la valeur V du carrefour SUIVANT.
                 next_stop = network.get_next_stop(self.node_id, car.tl)
                 v_next = 0.0
                 if next_stop is not None:
@@ -44,8 +89,8 @@ class TC2Agent:
                     next_state = (entry_tl, 20, car.destination)
                     v_next = all_agents[next_node_id].get_state_value(next_state)
                 
-                # Formule TC-2 : Gain = Q_rouge - (Q_vert + gamma * V_suivant)
-                car_gain = q_red - (q_green + self.gamma * v_next)
+                # Formule TC-2
+                car_gain = 0 - (0 + self.gamma * v_next)
                 total_gain += car_gain
             
             gains[action] = total_gain
