@@ -9,18 +9,18 @@ from agents.baseline_agent import FixedTimeAgent
 # ==========================================
 # CONFIGURATION DE L'EXPÉRIENCE
 # ==========================================
-AGENT_TYPE = "TC2"    # Options: "TC1", "TC2", "FIXED"
-TRAFFIC_LOAD = "HIGH"  # Options: "HIGH" (1-8 cars) ou "LOW" (1-4 cars)
-STEPS = 200000
+# AGENT_TYPE = "TC2"    # Options: "TC1", "TC2", "FIXED"
+# TRAFFIC_LOAD = "LOW"  # Options: "HIGH" (1-8 cars) ou "LOW" (1-4 cars)
+# STEPS = 200000
 # ==========================================
 
-def run_simulation():
+def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS=200000):
     # 1. Initialisation du réseau et des agents
-    network = TrafficNetwork()
+    network = TrafficNetwork(topology_type=topology)
     
     # Création d'un dictionnaire d'agents (un par intersection)
     agents = {}
-    for i in range(6):
+    for i in range(len(network.intersections)):
         if AGENT_TYPE == "TC1":
             agents[i] = TC1Agent(node_id=i)
         elif AGENT_TYPE == "TC2":
@@ -90,21 +90,23 @@ def run_simulation():
 
     # --- PHASE D : Sauvegarde et Rapport ---
     # Nom de fichier automatique selon la config
-    csv_filename = f"learning_stats_{AGENT_TYPE}_{TRAFFIC_LOAD}_v2.csv"
+    csv_filename = f"learning_stats_{AGENT_TYPE}_{TRAFFIC_LOAD}_{topology}.csv"
     with open(csv_filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Step", "AvgWaitTime"])
         writer.writerows(history)
     
     # Sauvegarde des "cerveaux"
-    for i in range(6):
-        agents[i].save_brain(f"models/tc1_v2/{AGENT_TYPE}_node_{i}.json")
+    for i in range(len(network.intersections)):
+        agents[i].save_brain(f"models/tc2_v2/{AGENT_TYPE}_{TRAFFIC_LOAD}_{topology}_node_{i}.json")
 
     print(f"\n--- RÉSULTATS {AGENT_TYPE} ({TRAFFIC_LOAD}) ---")
     print(f"Voitures sorties : {cars_exited}")
     print(f"Refusées : {refused_cars}")
     if cars_exited > 0:
         print(f"Attente moyenne : {total_waiting_time / cars_exited:.2f} cycles")
+    
+    return csv_filename
 
 if __name__ == "__main__":
     run_simulation()

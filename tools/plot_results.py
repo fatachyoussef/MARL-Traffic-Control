@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 1. Chargement des données
-data = pd.read_csv('learning_stats_TC2_HIGH_v2.csv')
+data = pd.read_csv('learning_stats_TC2_LOW_Complexe.csv')
 
 # 2. Configuration du style
 plt.figure(figsize=(10, 6))
@@ -13,13 +13,13 @@ data['SMA'] = data['AvgWaitTime'].rolling(window=10).mean()
 plt.plot(data['Step'], data['SMA'], color='#d62728', linestyle='--', label='Tendance (Moyenne mobile)')
 
 # 4. Habillage du graphique
-plt.title('Courbe d\'apprentissage de l\'agent TC-1 (MARL)', fontsize=14)
+plt.title('Courbe d\'apprentissage de l\'agent TC-2 (MARL) avec la topologie complexe', fontsize=14)
 plt.xlabel('Cycles de simulation (Steps)', fontsize=12)
 plt.ylabel('Temps d\'attente moyen (Cycles)', fontsize=12)
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend()
 
 # 5. Sauvegarde
-plt.savefig('learning_stats_TC2_HIGH_Fraude.png', dpi=300)
-print("Graphique sauvegardé sous 'learning_stats_TC2_HIGH_Fraude.png'")
+plt.savefig('learning_stats_TC2_LOW_Complexe.png', dpi=300)
+print("Graphique sauvegardé sous 'learning_stats_TC2_LOW_Complexe.png'")
 plt.show()
