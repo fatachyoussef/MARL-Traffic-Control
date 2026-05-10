@@ -76,32 +76,106 @@ steps_choice = st.sidebar.number_input(
     step=1000
 )
 
+# # --- Zone de lancement ---
+# if st.sidebar.button("🚀 Lancer la Simulation"):
+#     st.info(f"Simulation en cours : {agent_choice} sur {topo_choice} ({load_choice})...")
+    
+#     # Placeholder pour les stats en direct
+#     progress_bar = st.progress(0)
+#     status_text = st.empty()
+    
+#     # --- Appel de ton code main.py ---
+#     # Note : Pour que cela soit "live" dans Streamlit, 
+#     # il faudrait normalement ajouter des callbacks, 
+#     # mais commençons par l'exécution et l'affichage du résultat.
+    
+#     start_time = time.time()
+    
+#     # On lance la fonction que tu as modifiée dans main.py
+#     # Assure-toi que run_simulation retourne les stats finales ou le nom du CSV
+#     results = run_simulation(
+#         topology=topo_choice, 
+#         agent_type=agent_choice, 
+#         traffic_load=load_choice, 
+#         steps=steps_choice
+#     )
+    
+#     end_time = time.time()
+#     st.success(f"Simulation terminée en {end_time - start_time:.2f} secondes !")
+
 # --- Zone de lancement ---
 if st.sidebar.button("🚀 Lancer la Simulation"):
-    st.info(f"Simulation en cours : {agent_choice} sur {topo_choice} ({load_choice})...")
+    st.info(f"Simulation en cours : {agent_choice} sur {topo_choice}...")
     
-    # Placeholder pour les stats en direct
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # --- Appel de ton code main.py ---
-    # Note : Pour que cela soit "live" dans Streamlit, 
-    # il faudrait normalement ajouter des callbacks, 
-    # mais commençons par l'exécution et l'affichage du résultat.
-    
-    start_time = time.time()
-    
-    # On lance la fonction que tu as modifiée dans main.py
-    # Assure-toi que run_simulation retourne les stats finales ou le nom du CSV
-    results = run_simulation(
+    # Placeholders
+    progress_bar = st.sidebar.progress(0)
+    chart_placeholder = st.empty()
+    metrics_placeholder = st.empty()
+
+    # Utiliser une liste pour stocker les données (les listes sont mutables en Python, 
+    # donc on peut les modifier sans 'nonlocal')
+    history_steps = []
+    history_waits = []
+
+    def update_live_dashboard(current_step, current_wait, total_steps):
+        # On ajoute les données aux listes
+        history_steps.append(current_step)
+        history_waits.append(current_wait)
+        
+        # Mise à jour de l'interface
+        progress = current_step / total_steps
+        progress_bar.progress(progress)
+        
+        # Création d'un DataFrame temporaire pour l'affichage
+        current_df = pd.DataFrame({
+            "Step": history_steps,
+            "AvgWaitTime": history_waits
+        }).set_index("Step")
+        
+        with chart_placeholder.container():
+            st.line_chart(current_df)
+        
+        with metrics_placeholder.container():
+            st.metric("Attente moyenne actuelle", f"{current_wait:.2f} cycles")
+
+    # Appel de la simulation
+    run_simulation(
         topology=topo_choice, 
         agent_type=agent_choice, 
         traffic_load=load_choice, 
-        steps=steps_choice
+        steps=steps_choice,
+        st_callback=update_live_dashboard 
     )
     
-    end_time = time.time()
-    st.success(f"Simulation terminée en {end_time - start_time:.2f} secondes !")
+    st.success("Simulation terminée !")
+
+    # --- NOUVEAU : PANNEAU DE MÉTRIQUES FINALES ---
+    st.divider()
+    st.subheader("🏁 Synthèse des Performances Finales")
+    
+    final_wait = history_waits[-1] if history_waits else 0
+    
+    # On crée 3 colonnes pour les métriques
+    m1, m2, m3 = st.columns(3)
+    
+    with m1:
+        st.metric("Temps d'attente Final", f"{final_wait:.2f} cycles")
+    
+    with m2:
+        # Calcul de la stabilité (différence entre le début et la fin)
+        initial_wait = history_waits[0] if history_waits else 0
+        improvement = initial_wait - final_wait
+        st.metric("Gain d'Apprentissage", f"{improvement:.2f} cycles", delta=f"{improvement:.2f}")
+
+    with m3:
+        # Estimation du débit
+        st.metric("Statut du Modèle", "Sauvegardé", help=f"Modèle JSON stocké dans le dossier models/{agent_choice.lower()}_v2/")
+
+    # Ajout d'un conseil d'expert basé sur le résultat
+    if final_wait > 8:
+        st.warning("⚠️ Le réseau semble saturé. L'anticipation (TC2) pourrait aider à réguler les flux entrants.")
+    elif final_wait < 4:
+        st.info("✅ Excellente fluidité. Le modèle a convergé vers une politique optimale.")
 
 
 st.subheader(f"Plan du réseau : {topo_choice}")
@@ -139,20 +213,90 @@ if csv_files:
 else:
     st.warning("Aucun fichier de données (.csv) trouvé. Lancez une simulation pour générer des résultats.")
 
-# --- Zone de Comparaison (Bonus) ---
+# # --- Zone de Comparaison (Bonus) ---
+# if len(csv_files) >= 2:
+#     st.divider()
+#     st.header("⚖️ Comparaison Multi-Modèles")
+#     selected_models = st.multiselect("Choisir les fichiers à comparer", csv_files, default=csv_files[:2])
+    
+#     if selected_models:
+#         combined_df = pd.DataFrame()
+#         for file in selected_models:
+#             temp_df = pd.read_csv(file)
+#             temp_df['Model'] = file.replace('learning_stats_', '').replace('.csv', '')
+#             combined_df = pd.concat([combined_df, temp_df])
+        
+#         # Graphique de comparaison
+#         st.write("Comparaison de la convergence (Attente vs Temps)")
+#         # Ici on peut utiliser une librairie comme Plotly pour plus de détails
+#         st.line_chart(combined_df.pivot(index='Step', columns='Model', values='AvgWaitTime'))
+
+# --- Zone de Comparaison (Expert) ---
 if len(csv_files) >= 2:
     st.divider()
-    st.header("⚖️ Comparaison Multi-Modèles")
-    selected_models = st.multiselect("Choisir les fichiers à comparer", csv_files, default=csv_files[:2])
+    st.header("⚖️ Comparaison Multi-Modèles & ROI")
     
-    if selected_models:
-        combined_df = pd.DataFrame()
-        for file in selected_models:
-            temp_df = pd.read_csv(file)
-            temp_df['Model'] = file.replace('learning_stats_', '').replace('.csv', '')
-            combined_df = pd.concat([combined_df, temp_df])
+    # 1. Sélection précise pour le Duel
+    col_a, col_b = st.columns(2)
+    with col_a:
+        model_a = st.selectbox("Modèle de Référence (Base)", csv_files, key="duel_a")
+    with col_b:
+        model_b = st.selectbox("Modèle Challenger (Test)", csv_files, key="duel_b")
+
+    if model_a and model_b:
+        df_a = pd.read_csv(model_a)
+        df_b = pd.read_csv(model_b)
+
+        # --- CALCUL DU ROI (Return on Investment / Gain de performance) ---
+        # On prend la moyenne des 10% dernières étapes pour comparer la stabilité finale
+        last_n = max(1, int(len(df_a) * 0.1))
+        avg_a = df_a['AvgWaitTime'].tail(last_n).mean()
+        avg_b = df_b['AvgWaitTime'].tail(last_n).mean()
         
-        # Graphique de comparaison
-        st.write("Comparaison de la convergence (Attente vs Temps)")
-        # Ici on peut utiliser une librairie comme Plotly pour plus de détails
-        st.line_chart(combined_df.pivot(index='Step', columns='Model', values='AvgWaitTime'))
+        # Calcul du pourcentage d'amélioration
+        # Un chiffre positif signifie que B est meilleur (temps plus bas)
+        roi_improvement = ((avg_a - avg_b) / avg_a) * 100
+
+        # Affichage du ROI avec un grand indicateur
+        st.subheader("🎯 Analyse du Gain de Performance (ROI)")
+        if roi_improvement > 0:
+            st.success(f"L'agent challenger réduit le temps d'attente de **{roi_improvement:.2f}%** par rapport au modèle de référence.")
+        else:
+            st.warning(f"L'agent challenger est **{abs(roi_improvement):.2f}%** moins efficace que le modèle de référence.")
+
+        # --- TABLEAU DE DUEL (Head-to-Head) ---
+        st.subheader("⚔️ Tableau de Duel")
+        
+        duel_data = {
+            "Métrique": [
+                "Temps d'attente final (moyen)", 
+                "Temps d'attente maximum", 
+                "Stabilité (Écart-type)",
+                "Écart par rapport à la référence"
+            ],
+            "Modèle A (Base)": [
+                f"{avg_a:.2f} cycles",
+                f"{df_a['AvgWaitTime'].max():.2f} cycles",
+                f"{df_a['AvgWaitTime'].std():.3f}",
+                "-"
+            ],
+            "Modèle B (Challenger)": [
+                f"{avg_b:.2f} cycles",
+                f"{df_b['AvgWaitTime'].max():.2f} cycles",
+                f"{df_b['AvgWaitTime'].std():.3f}",
+                f"{roi_improvement:+.2f}%"
+            ]
+        }
+        st.table(pd.DataFrame(duel_data))
+
+        # --- GRAPHIQUE COMPARATIF SUPERPOSÉ ---
+        st.subheader("📈 Comparaison des Courbes de Convergence")
+        
+        # On synchronise les étapes pour le graphique
+        comparison_df = pd.DataFrame({
+            "Step": df_a["Step"],
+            "Modèle A (Base)": df_a["AvgWaitTime"],
+            "Modèle B (Challenger)": df_b["AvgWaitTime"]
+        }).set_index("Step")
+        
+        st.line_chart(comparison_df)

@@ -14,16 +14,16 @@ from agents.baseline_agent import FixedTimeAgent
 # STEPS = 200000
 # ==========================================
 
-def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS=200000):
+def run_simulation(topology="GRID", agent_type="TC1", traffic_load="HIGH", steps=200000, st_callback=None):
     # 1. Initialisation du réseau et des agents
     network = TrafficNetwork(topology_type=topology)
     
     # Création d'un dictionnaire d'agents (un par intersection)
     agents = {}
     for i in range(len(network.intersections)):
-        if AGENT_TYPE == "TC1":
+        if agent_type == "TC1":
             agents[i] = TC1Agent(node_id=i)
-        elif AGENT_TYPE == "TC2":
+        elif agent_type == "TC2":
             agents[i] = TC2Agent(node_id=i)
         else:
             # On définit un cycle de 30 steps par exemple
@@ -35,11 +35,11 @@ def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS
     refused_cars = 0
     history = []
 
-    print(f"Lancement simulation {AGENT_TYPE} | Densité: {TRAFFIC_LOAD} | Cycles: {STEPS}")
+    print(f"Lancement simulation {agent_type} | Densité: {traffic_load} | Cycles: {steps}")
 
-    for step in tqdm(range(STEPS)):
+    for step in tqdm(range(steps)):
         # --- PHASE A : Génération de trafic ---
-        max_cars = 8 if TRAFFIC_LOAD == "HIGH" else 4
+        max_cars = 8 if traffic_load == "HIGH" else 4
         num_new_cars = random.randint(1, max_cars)
         
         for _ in range(num_new_cars):
@@ -58,7 +58,7 @@ def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS
         # --- PHASE B : Prise de décision (Le Vote) ---
         node_decisions = {}
         for node_id, intersection in network.intersections.items():
-            if AGENT_TYPE == "TC1":
+            if agent_type == "TC1":
                 # TC1 utilise uniquement les données locales
                 node_decisions[node_id] = agents[node_id].select_action(intersection)
             else:
@@ -88,9 +88,13 @@ def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS
             current_avg = total_waiting_time / cars_exited
             history.append((step, current_avg))
 
+            # Si Streamlit nous a passé une fonction de mise à jour
+            if st_callback:
+                st_callback(step, current_avg, steps)
+
     # --- PHASE D : Sauvegarde et Rapport ---
     # Nom de fichier automatique selon la config
-    csv_filename = f"learning_stats_{AGENT_TYPE}_{TRAFFIC_LOAD}_{topology}.csv"
+    csv_filename = f"learning_stats_{agent_type}_{traffic_load}_{topology}.csv"
     with open(csv_filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Step", "AvgWaitTime"])
@@ -98,9 +102,9 @@ def run_simulation(topology="GRID", AGENT_TYPE="TC1", TRAFFIC_LOAD="HIGH", STEPS
     
     # Sauvegarde des "cerveaux"
     for i in range(len(network.intersections)):
-        agents[i].save_brain(f"models/tc2_v2/{AGENT_TYPE}_{TRAFFIC_LOAD}_{topology}_node_{i}.json")
+        agents[i].save_brain(f"models/tc2_v2/{agent_type}_{traffic_load}_{topology}_node_{i}.json")
 
-    print(f"\n--- RÉSULTATS {AGENT_TYPE} ({TRAFFIC_LOAD}) ---")
+    print(f"\n--- RÉSULTATS {agent_type} ({traffic_load}) ---")
     print(f"Voitures sorties : {cars_exited}")
     print(f"Refusées : {refused_cars}")
     if cars_exited > 0:
