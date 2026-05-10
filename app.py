@@ -3,13 +3,47 @@ import pandas as pd
 import time
 import os
 import sys
+import networkx as nx
+import matplotlib.pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 # Importe ta fonction de simulation modifiée
 from main import run_simulation 
+from env.network import TrafficNetwork # Pour accéder à la logique du réseau
 
 # --- Configuration de la page ---
 st.set_page_config(page_title="MARL Traffic Control Dashboard", layout="wide")
+
+def draw_topology(topology_type):
+    # 1. On crée une instance temporaire pour lire les connexions
+    temp_net = TrafficNetwork(topology_type=topology_type)
+    connections = temp_net.connections
+    
+    # 2. Création du graphe dirigé (les flèches indiquent le sens de circulation)
+    G = nx.DiGraph()
+    
+    # 3. Ajout des arêtes à partir du dictionnaire connections
+    # connections est (node_src, tl_src) -> (node_dest, tl_dest)
+    for (node_src, tl_src), (node_dest, tl_dest) in connections.items():
+        G.add_edge(node_src, node_dest)
+    
+    # 4. Définition des positions des nœuds
+    # Pour la GRID, on peut forcer une disposition rectangulaire
+    if topology_type == "GRID":
+        pos = {0: (0, 1), 1: (1, 1), 2: (2, 1),
+               3: (0, 0), 4: (1, 0), 5: (2, 0)}
+    else:
+        # Pour COMPLEX, on laisse NetworkX calculer une forme aérée
+        pos = nx.spring_layout(G, seed=42) 
+    
+    # 5. Création de la figure Matplotlib
+    fig, ax = plt.subplots(figsize=(8, 5))
+    nx.draw(G, pos, with_labels=True, node_color='skyblue', 
+            node_size=2000, edge_color='gray', arrows=True, 
+            arrowsize=20, font_size=15, font_weight='bold', ax=ax, connectionstyle='arc3,rad=0.1')
+    
+    plt.title(f"Visualisation de la Topologie : {topology_type}")
+    return fig
 
 st.title("🚦 MARL Traffic Control - Dashboard de Simulation")
 st.markdown("""
@@ -69,9 +103,16 @@ if st.sidebar.button("🚀 Lancer la Simulation"):
     end_time = time.time()
     st.success(f"Simulation terminée en {end_time - start_time:.2f} secondes !")
 
+
+st.subheader(f"Plan du réseau : {topo_choice}")
+fig_map = draw_topology(topo_choice)
+st.pyplot(fig_map)
+
 # --- Affichage des Résultats ---
 st.divider()
 st.header("📊 Analyse des Performances")
+
+
 
 # On cherche les fichiers CSV générés dans le dossier
 csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
